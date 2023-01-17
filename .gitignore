@@ -40,3 +40,5 @@ vignettes/*.pdf
 
 # Project specific files to omit
 Prism/
+*.png
+*.kml
