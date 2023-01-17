@@ -35,6 +35,13 @@ https://cran.r-project.org/web/packages/MODISTools/vignettes/modistools-vignette
 Values in the land cover download do not match any legend I can find.
 (e.g., here: https://lpdaac.usgs.gov/documents/101/MCD12_User_Guide_V6.pdf or https://developers.google.com/earth-engine/datasets/catalog/MODIS_006_MCD12Q1#bands)
 
+It turns out that this software is somewhat unsettled.
+
+* steps that depend on rgdal, raster, sp, etc. will be depricated soon
+* Version 1.1.3 breaks the mt_to_raster function
+  * waiting on feedback from author to solve
+  * solved in draft, testing
+
 Not sure how to do legends.
 
 ```{r modisdata}
