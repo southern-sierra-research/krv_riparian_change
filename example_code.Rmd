@@ -17,7 +17,7 @@ There are 3 MODIS packages. All have problems due to transition away from packag
 * MODIStools is being actively updated but is not fully compatible yet
   * For example, mt_to_raster needs to be replaced by mt_to_terra
   * that is why we load this modified function here
-* MODIStsp is being updated but is not compatible either still using rgdal and raster packages
+* MODIStsp is being updated but is not compatible either, still using rgdal and raster packages
   * this one has a GUI mode and a programatic mode
   
 
