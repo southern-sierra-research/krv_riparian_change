@@ -9,18 +9,61 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## MODIS R packages
+
+There are 3 MODIS packages. All have problems due to transition away from packages maintained by , who is retiring, leading to the sunsetting of packages like rgdal, raster, sp, etc.
+
+* MODIS depends on rgdal and has not been updated yet to deal with the transition
+* MODIStools is being actively updated but is not fully compatible yet
+  * For example, mt_to_raster needs to be replaced by mt_to_terra
+  * that is why we load this modified function here
+* MODIStsp is being updated but is not compatible either still using rgdal and raster packages
+  * this one has a GUI mode and a programatic mode
+  
+
 ## Using MODISTools
 
 
 ```{r installload}
 # install.packages("MODISTools")
+# install.packages("MODIStsp")
+# install.packages("shinydashboard")
+# install.packages("shinyFiles")
+# install.packages("shinyalert")
+# install.packages("rappdirs")
+# install.packages("shinyjs")
+# install.packages("leafem")
+# install.packages("mapedit")
+# install.packages("magrittr")
+# install.packages("MODIStsp")
+
+# library(devtools)
+# install_github(rspatial/luna)
 
 library(dplyr)
 library(MODISTools)
+library(MODIStsp)
 library(raster)
 library(sf)
 library(leaflet)
+library(raster)
+library(terra)
+library(luna)
+
+library(shiny)
+library(shinydashboard)
+library(shinyFiles)
+library(shinyalert)
+library(rappdirs)
+library(shinyjs)
+library(leafem)
+library(mapedit)
+library(magrittr)
+
 library(prism)
+library(rgdal)
+# library(terra)
+library(dismo)
 
 library(lubridate)
 
@@ -47,7 +90,7 @@ It turns out that this software is somewhat unsettled.
 
 Not sure how to do legends.
 
-```{r modisdata}
+```{r modistools}
 # NDVI
 products <- mt_products()
 View(products)
@@ -149,18 +192,202 @@ plot(st_geometry(testpoints_sf), add = T)
 
 ```
 
+
+## Using MODIStsp
+
+This now works, but continues to depend on many of the soon to be unsupported packages.
+
+```{r modistsp}
+MODIStsp()
+
+```
+
+## Using terr and luna
+
+Based on this example:
+https://rspatial.org/modis/2-download.html
+
+```{r terraluna}
+prod <- getProducts()
+
+prod_ndvi = prod %>%
+  filter(grepl("(?i)NDVI", x = short_name))
+
+product = "US_MODIS_NDVI_1299"
+product = "dsp10_ndvi_600"
+product = "GOSAT_Level3_of_TANSO-CAI_NDVI"
+product = 
+product = 
+product = 
+productInfo(product)
+```
+
+
 ## PRISM weather data
 
 https://github.com/ropensci/prism
+
+We may want to group these by the 12 months before the
+
+### Bioclim summary
+
+https://www.worldclim.org/data/bioclim.html
+
+Summarizing weather data by month and quarter according to Bioclim method.
+
+Layer descriptions:
+
+BIO1 = Annual Mean Temperature
+BIO2 = Mean Diurnal Range (Mean of monthly (max temp - min temp))
+BIO3 = Isothermality (BIO2/BIO7) (×100)
+BIO4 = Temperature Seasonality (standard deviation ×100)
+BIO5 = Max Temperature of Warmest Month
+BIO6 = Min Temperature of Coldest Month
+BIO7 = Temperature Annual Range (BIO5-BIO6)
+BIO8 = Mean Temperature of Wettest Quarter
+BIO9 = Mean Temperature of Driest Quarter
+BIO10 = Mean Temperature of Warmest Quarter
+BIO11 = Mean Temperature of Coldest Quarter
+BIO12 = Annual Precipitation
+BIO13 = Precipitation of Wettest Month
+BIO14 = Precipitation of Driest Month
+BIO15 = Precipitation Seasonality (Coefficient of Variation)
+BIO16 = Precipitation of Wettest Quarter
+BIO17 = Precipitation of Driest Quarter
+BIO18 = Precipitation of Warmest Quarter
+BIO19 = Precipitation of Coldest Quarter
 
 ```{r prism}
 prism_get_dl_dir()
 # prism_set_dl_dir("Prism")
 prism_check_dl_dir()
 
-# This will take a long time, especially at SSRS
-get_prism_monthlys(type = "ppt", year = 2000:2022, mon = 1:12, keepZip = FALSE)
+# This may take a long time on a slow connection (not bad with new Starlink)
+get_prism_monthlys(type = "ppt", year = 2021:2022, mon = 1:12, keepZip = FALSE)
+get_prism_monthlys(type = "tmax", year = 2021:2022, mon = 1:12, keepZip = FALSE)
+get_prism_monthlys(type = "tmin", year = 2021:2022, mon = 1:12, keepZip = FALSE)
+
+prism_archive_ls()
+
+ppt_21 = prism_archive_subset("ppt", "monthly", years = 2021)
+# ppt_22 = prism_archive_subset("ppt", "monthly", years = 2022)
+ppt_21_7_12 = prism_archive_subset("ppt", "monthly", mon = 7:12, years = 2021)
+ppt_22_1_6 = prism_archive_subset("ppt", "monthly", mon = 1:6, years = 2022)
+
+tmax_21 = prism_archive_subset("tmax", "monthly", years = 2021)
+# tmax_22 = prism_archive_subset("tmax", "monthly", years = 2022)
+tmax_21_7_12 = prism_archive_subset("tmax", "monthly", mon = 7:12, years = 2021)
+tmax_22_1_6 = prism_archive_subset("tmax", "monthly", mon = 1:6, years = 2022)
+
+tmin_21 = prism_archive_subset("tmin", "monthly", years = 2021)
+# tmin_22 = prism_archive_subset("tmin", "monthly", years = 2022)
+tmin_21_7_12 = prism_archive_subset("tmin", "monthly", mon = 7:12, years = 2021)
+tmin_22_1_6 = prism_archive_subset("tmin", "monthly", mon = 1:6, years = 2022)
+
+ppt_21 = pd_to_file(ppt_21)
+# ppt_22 = pd_to_file(ppt_22)
+ppt_21_7_12= pd_to_file(ppt_21_7_12)
+ppt_22_1_6 = pd_to_file(ppt_22_1_6)
+
+tmax_21 = pd_to_file(tmax_21)
+# tmax_22 = pd_to_file(tmax_22)
+tmax_21_7_12 = pd_to_file(tmax_21_7_12)
+tmax_22_1_6 = pd_to_file(tmax_22_1_6)
+
+tmin_21 = pd_to_file(tmin_21)
+# tmin_22 = pd_to_file(tmin_22)
+tmin_21_7_12 = pd_to_file(tmin_21_7_12)
+tmin_22_1_6 = pd_to_file(tmin_22_1_6)
+
+# dismo::biovars does not work on spatrasters
+#   But maybe someday...
+# ppt_21 = rast(ppt_21)
+
+# Get period of interest all of 2021 and months 1-6 of 2023
+ppt = raster::stack(c(ppt_21, ppt_22_1_6))
+tmax = raster::stack(c(tmax_21, tmax_22_1_6))
+tmin = raster::stack(c(tmin_21, tmin_22_1_6))
+
+# ppt_21 = raster::stack(ppt_21)
+# ppt_22 = raster::stack(ppt_22)
+# tmax_21 = raster::stack(tmax_21)
+# tmax_22 = raster::stack(tmax_22)
+# tmin_21 = raster::stack(tmin_21)
+# tmin_22 = raster::stack(tmin_22)
+
+# needs to be 12 months for biovars
+ppt12 = raster::stack(c(ppt_21_7_12, ppt_22_1_6))
+tmax12 = raster::stack(c(tmax_21_7_12, tmax_22_1_6))
+tmin12 = raster::stack(c(tmin_21_7_12, tmin_22_1_6))
+biovars = biovars(prec = ppt12, tmin = tmin12, tmax = tmax12)
+crs(biovars)
+
+biovarsprism = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/YBCU - Rangewide Surveys CSWG/GIS/PrismWeatherSummaries2021_2022"
+
+# Multiband raster
+raster::writeRaster(biovars, filename = file.path(biovarsprism, "biovarsPrismJune21_22.bil"), format = "EHdr",overwrite = T)
+# Bands seperated
+raster::writeRaster(biovars, filename = file.path(biovarsprism, "biovarsPrismJune21_22.bil"), format = "EHdr",overwrite = T, bylayer = T)
+
 ```
+
+## summarize data by sub-watersheds
+
+'hybas_na_lev01-12_v1c' has watersheds at 12 levels, so this approach would work at other levels.
+
+```{r subwatersheds}
+huc8 = readOGR("hybas_na_lev01-12_v1c/hybas_na_lev08_v1c.shp")
+
+huc8_2 = huc8
+
+# Mean
+# spatRaster method
+huc8_vect = vect("hybas_na_lev01-12_v1c/hybas_na_lev08_v1c.shp")
+ppt_sr = rast(ppt)
+proj4string(ppt)
+crs(ppt_sr) = "epsg:4269"
+huc8_vect_4269 = project(huc8_vect, ppt_sr)
+ppt_mean_huc8_vect = terra::extract(ppt_sr, huc8_vect_4269, fun = mean, bind = T)
+writeVector(ppt_mean_huc8_vect, 
+            filename = file.path(biovarsprism, "ppt_mean_huc8_vect.shp"), 
+            filetype = "ESRI Shapefile", 
+            overwrite=TRUE)
+
+# raster method
+ppt_mean_huc8 = extract(ppt, huc8, fun = mean)
+
+ppt_mean_huc8.df = as.data.frame(ppt_mean_huc8)
+huc8@data = data.frame(huc8@data, ppt_mean_huc8.df)
+
+colnames(huc8@data)[14:31] = c(paste("pptmn21", 1:12, sep = "_"), 
+                               paste("pptmn22", 1:6, sep = "_"))
+writeOGR(huc8, ".", "ppt_mean_huc8.shp", driver = "ESRI Shapefile")
+writeOGR(huc8, file.path(biovarsprism, "ppt_mean_huc8.shp"), ppt_mean_huc8, driver = "ESRI Shapefile")
+
+# Sum
+# spatRaster method
+# huc8_vect = vect("hybas_na_lev01-12_v1c/hybas_na_lev08_v1c.shp")
+# ppt_sr = rast(ppt)
+ppt_sum_huc8_vect = terra::extract(ppt_sr, huc8_vect_4269, fun = sum, bind = T)
+writeVector(ppt_sum_huc8_vect, 
+            filename = file.path(biovarsprism, "ppt_sum_huc8_vect.shp"), 
+            filetype = "ESRI Shapefile", 
+            overwrite=TRUE)
+
+# raster method
+# Not used
+# ppt_sum_huc8 = extract(ppt, huc8, fun = sum)
+# 
+# ppt_sum_huc8.df = as.data.frame(ppt_sum_huc8)
+# 
+# huc8_2@data = data.frame(huc8_2@data, ppt_sum_huc8.df)
+# 
+# colnames(huc8_2@data)[14:31] = c(paste("pptsum21", 1:12, sep = "_"), 
+#                                paste("pptsum22", 1:6, sep = "_"))
+# writeOGR(huc8_2, ".", fname = file.path(biovarsprism, "ppt_sum_huc8.shp"), driver = "ESRI Shapefile")
+
+```
+
 
 
 ## Some better plots
