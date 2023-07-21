@@ -38,7 +38,7 @@ There are 3 MODIS packages. All have problems due to transition away from packag
 # install.packages("MODIStsp")
 
 # library(devtools)
-# install_github(rspatial/luna)
+# install_github("rspatial/luna")
 
 library(dplyr)
 library(MODISTools)
@@ -62,12 +62,12 @@ library(magrittr)
 
 library(prism)
 library(rgdal)
-# library(terra)
 library(dismo)
 
 library(lubridate)
 
-source("mt_to_terra.R")
+# Not needed now that this function exists in MODIStools
+# source("mt_to_terra.R")
 
 dir.create("Prism")
 prism_set_dl_dir("Prism")
@@ -81,12 +81,12 @@ https://cran.r-project.org/web/packages/MODISTools/vignettes/modistools-vignette
 Values in the land cover download do not match any legend I can find.
 (e.g., here: https://lpdaac.usgs.gov/documents/101/MCD12_User_Guide_V6.pdf or https://developers.google.com/earth-engine/datasets/catalog/MODIS_006_MCD12Q1#bands)
 
-It turns out that this software is somewhat unsettled.
+When I started testing this package, this software is somewhat unsettled.
 
-* steps that depend on rgdal, raster, sp, etc. will be depricated soon
-* Version 1.1.3 breaks the mt_to_raster function
-  * waiting on feedback from author to solve
-  * solved in draft, testing
+* steps that depended on rgdal, raster, sp, etc. were being depricated soon
+* Version 1.1.3 broke the mt_to_raster function
+  * Author sent a workaround with test version of mt_to_terra that did not work
+  * solved in 1.1.4 with addition of mt_to_terra
 
 Not sure how to do legends.
 
@@ -99,6 +99,7 @@ bands <- mt_bands(product = "MOD13Q1")
 View(bands)
 dates <- mt_dates(product = "MOD13Q1", lat = 32, lon = -114)
 View(dates)
+range(dates$calendar_date)
 dates_june2august_ndvi = dates %>%
   filter(month(calendar_date) %in% 6:8)
 
@@ -192,6 +193,244 @@ plot(st_geometry(testpoints_sf), add = T)
 
 ```
 
+## MODIStools tutorial example with QA/QC
+
+https://jepsonnomad.github.io/tutorials/MODISTools_Intro.html
+
+```{r modistoolstutoial}
+library(MODISTools)
+library(ggplot2)
+library(sf)
+
+# This is only necessary if you have to make maps with ggplot2. Leaflet is better
+# install.packages("USA.state.boundaries")
+# install.packages("ggrepel")
+# install.packages("usmap")
+# library(USA.state.boundaries)
+# library(ggrepel)
+# library(usmap)
+# 
+# plot_usmap(regions = "counties")
+
+# Checking that testpoints, etc. is set up above
+View(testpoints)
+testpoints2 = testpoints
+names(testpoints2) = c("site_name", "lat", "lon")
+
+View(dates)
+range(dates$calendar_date)
+
+startDate = "2016-01-01"
+endDate = "2022-12-31"
+
+bands$band
+
+bandsOfInterest = bands[c(12,7,5,2),]$band
+bandsOfInterest
+
+MODproduct = "MOD13Q1"
+
+# Benchmark the download time
+dlStart = Sys.time()
+
+# Batch download MODIS timeseries
+VIQ = mt_batch_subset(df = testpoints2,
+                      product = MODproduct,
+                      band = bandsOfInterest[1],
+                      internal = T,
+                      start = startDate,
+                      end = endDate)
+PR = mt_batch_subset(df = testpoints2,
+                     product = MODproduct,
+                     band = bandsOfInterest[2],
+                     internal = T,
+                     start = startDate,
+                     end = endDate)
+NDVI = mt_batch_subset(df = testpoints2,
+                      product = MODproduct,
+                      band = bandsOfInterest[3],
+                      internal = T,
+                      start = startDate,
+                      end = endDate)
+DOY = mt_batch_subset(df = testpoints2,
+                      product = MODproduct,
+                      band = bandsOfInterest[4],
+                      internal = T,
+                      start = startDate,
+                      end = endDate)
+dlEnd = Sys.time()
+dlEnd - dlStart
+
+# Make a new data.frame that will contain binarized VIQ values.
+VIQbin = VIQ
+
+# Solve for VI Quality
+# Source: https://gis.stackexchange.com/questions/144441/how-can-i-parse-modis-mod13q1-quality-layers-in-r
+first_k_bits <- function(int, k=16, reverse=T) {
+  integer_vector <- as.integer(intToBits(int))[1:k]
+  if(reverse) integer_vector <- rev(integer_vector)
+  return(paste(as.character(integer_vector), collapse=""))
+}
+
+# We can check the output of the function using 7633, a point of reference provided on the MODIS QA tutorial (see link above)
+
+# first_k_bits(7633)
+# Binary of 7633 is 0001110111010001
+
+# MODLAND QA = bits 0-1 = bitword 01
+# QA bitword 01 for 7633 is "01"
+# therefore substr(firstkbits(x), start = 15, stop = 16) is
+# an indicator of overall VI Quality with 
+# 00 = good quality
+# 01 = VI produced but check other layers
+# 10 = Probably cloudy
+# 11 = Pixel not produced
+
+# Binarize the VIQ values:
+VIQbin_list = lapply(VIQ$value,
+                FUN = first_k_bits)
+VIQbin_vector = unlist(VIQbin_list)
+VIQbin$value = as.character(VIQbin_vector)
+
+# Compile each band's time series dataframe into a list.
+myBands = list(VIQbin,
+               PR,
+               NDVI,
+               DOY)
+
+## QA/QC
+
+# Visualize Pixel Reliability time series
+# Note that PR == 0 means good data
+# PR == 1 is maybe good, but we should check other VIQ stuff
+# Here, I added a slight jitter to aid with visibility of 
+# overlapping points.
+ggplot(myBands[[2]],
+       aes(x = as.POSIXct(calendar_date),
+           y = value,
+           col = site)) + 
+  geom_jitter(width = 0.1, height = 0.1) +
+  geom_line() +
+  ylab("QA") +
+  xlab("Date") +
+  ggtitle("Raw pixel quality") +
+  theme_classic() +
+  scale_color_brewer(palette = "Dark2")
+
+# Land/water; this flag lives on bits 11-13, which comprise the 
+# 3rd through 5th integers in the converted VIQ string.
+ggplot(myBands[[1]],
+       aes(x = as.POSIXct(calendar_date),
+           y = substr(value, start = 3, stop = 5),
+           col = site)) + 
+  geom_jitter(width = 0.1, height = 0.1) +
+  ylab("LandWater") +
+  xlab("Date") +
+  ggtitle("Land/Water Flag") +
+  theme_classic() +
+  scale_color_brewer(palette = "Dark2")
+
+# Snow/ice; this flag is bit 14, which is the second integer 
+# in the converted VIQ string
+ggplot(myBands[[1]],
+       aes(x = as.POSIXct(calendar_date),
+           y = as.numeric(substr(value, start = 2, stop = 2)),
+           col = site)) + 
+  geom_jitter(width = 0.1, height = 0.1) +
+  geom_line() +
+  ylab("SnowIce") +
+  xlab("Date") +
+  ggtitle("Snow/Ice Flag") +
+  theme_classic() +
+  scale_color_brewer(palette = "Dark2")
+
+# Visualize raw NDVI
+# Note that MODIS reports NDVI on a scale of 10,000, so divide the values accordingly for visualization.
+Rawplot = ggplot(myBands[[3]],
+       aes(x = as.POSIXct(calendar_date),
+           y = value/10000,
+           col = site)) + 
+  geom_point() +
+  geom_line() +
+  ylab("NDVI") +
+  xlab("Date") +
+  ggtitle("Raw NDVI download") +
+  theme_classic() +
+  scale_color_brewer(palette = "Dark2"); Rawplot
+
+# Remove instances where pixel reliability is > 1 (bad data!)
+# This makes a new list object with the same elements as myBands, 
+# but values for all bands where Pixel Reliability > 1 are 
+# converted into NA's.
+PR_filtered = lapply(myBands,
+                     function(x){
+                       x$value[myBands[[2]]$value > 1] <- NA
+                       return(x)
+                     })
+# Visualize
+PRplot = ggplot(PR_filtered[[3]],
+       aes(x = as.POSIXct(calendar_date),
+           y = value/10000,
+           col = site)) + 
+  geom_point() +
+  geom_line() +
+  ylab("NDVI") +
+  xlab("Date") +
+  ggtitle("After pixel reliability filter") +
+  theme_classic() +
+  scale_color_brewer(palette = "Dark2"); PRplot
+
+# Mask out additional data based on land/water and snow/ice masks
+VIQ_filtered = lapply(PR_filtered,
+                      FUN = function(x){
+                        x$value[substr(PR_filtered[[1]]$value,
+                          start = 3, stop = 5) != "001"] <- NA
+                        x$value[substr(PR_filtered[[1]]$value,
+                          start = 2, stop = 2) != "0"] <- NA
+                        return(x)
+                      })
+# Visualize
+VIQplot = ggplot(VIQ_filtered[[3]],
+       aes(x = as.POSIXct(calendar_date),
+           y = value/10000,
+           col = site)) + 
+  geom_point() +
+  geom_line() +
+  ylab("NDVI") +
+  xlab("Date") +
+  ggtitle("After pixel land/water mask") +
+  theme_classic() +
+  scale_color_brewer(palette = "Dark2"); VIQplot
+
+# Add three columns to each data.frame based on the DOY layer. 
+DOY_corrected = lapply(VIQ_filtered,
+                       FUN = function(x){
+                         x$DOY = VIQ_filtered[[4]]$value
+                         x$Year = substr(x$calendar_date,
+                                         start = 1,
+                                         stop = 4)
+                         x$YearDOY = paste(x$Year,
+                                           x$DOY,
+                                           sep = "-")
+                         return(x)
+                       })
+
+# Visualize
+DOYplot = ggplot(DOY_corrected[[3]],
+       aes(x = as.POSIXct(YearDOY, 
+                          format = "%Y-%j", 
+                          origin = "2001-01-01"),
+           y = value/10000,
+           col = site)) + 
+  geom_point() +
+  geom_line() +
+  ylab("NDVI") +
+  xlab("Date") +
+  ggtitle("Accounting for composite date") +
+  theme_classic() +
+  scale_color_brewer(palette = "Dark2"); DOYplot
+```
+
 
 ## Using MODIStsp
 
@@ -202,7 +441,7 @@ MODIStsp()
 
 ```
 
-## Using terr and luna
+## Using terra and luna
 
 Based on this example:
 https://rspatial.org/modis/2-download.html
@@ -413,6 +652,11 @@ leaflet() %>%
   addTiles() %>%
   addRasterImage(tp_r_ndvi, colors = pal_ndvi, opacity = 0.75, group = label_ndvi) %>%
   # addRasterImage(tp_r_lc, colors = pal_lc, opacity = 0.75, group = label_lc) %>%
+  addMarkers(testpoints2, 
+             lng = testpoints2$lon, 
+             lat = testpoints2$lat, 
+             label = testpoints2$site_name,
+             group = "Test Points") %>%
   addLegend(
     pal = pal_ndvi, values = values(tp_r_ndvi),
     title = label_ndvi
@@ -427,7 +671,7 @@ leaflet() %>%
   addLayersControl(
     baseGroups = c("OpenStreetMap", "ESRI World Imagery", "ESRI World Topo"),
     # overlayGroups = c(label_ndvi, label_lc),
-    overlayGroups = c(label_ndvi),
+    overlayGroups = c(label_ndvi, "Test Points"),
     options = layersControlOptions(collapsed = FALSE,),
     position = "bottomleft"
   )
