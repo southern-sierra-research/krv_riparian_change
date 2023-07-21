@@ -142,8 +142,12 @@ names(tp_df)[3:4] = c("lon", "lat")
 
 
 # Find date of overflight for use in subsets below
-dates08 = mt_dates(product = "MOD13Q1", lat = tp_df$lat[1], lon = tp_df$lon[1])
-dates08[lubridate::year(dates08$calendar_date)==2008,]
+dates = mt_dates(product = "MOD13Q1", lat = tp_df$lat[1], lon = tp_df$lon[1])
+View(dates)
+dates08[lubridate::year(dates$calendar_date)==2008,]
+dates00[lubridate::year(dates$calendar_date)==2000,]
+dates10[lubridate::year(dates$calendar_date)==2010,]
+dates20[lubridate::year(dates$calendar_date)==2020,]
 
 subsets <- mt_batch_subset(df = tp_df,
                      product = "MOD13Q1",
@@ -158,6 +162,44 @@ subsets <- mt_batch_subset(df = tp_df,
 tp_r = mt_to_terra(subsets, reproject = T)
 
 plot(tp_r)
+plot(st_geometry(testpoints_sf), add = T)
+
+# Lakebottom and preserve
+lbp_subsets_00 <- mt_batch_subset(df = tp_df[1,],
+                     product = "MOD13Q1",
+                     band = "250m_16_days_NDVI",
+                     km_lr = 5,
+                     km_ab = 1,
+                     start = "2000-06-09",
+                     end = "2000-06-09",
+                     internal = TRUE)
+lbp_subsets_10 <- mt_batch_subset(df = tp_df,
+                     product = "MOD13Q1",
+                     band = "250m_16_days_NDVI",
+                     km_lr = 5,
+                     km_ab = 1,
+                     start = "2010-06-10",
+                     end = "2010-06-10",
+                     internal = TRUE)
+lbp_subsets_20 <- mt_batch_subset(df = tp_df,
+                     product = "MOD13Q1",
+                     band = "250m_16_days_NDVI",
+                     km_lr = 5,
+                     km_ab = 1,
+                     start = "2020-06-09",
+                     end = "2020-06-09",
+                     internal = TRUE)
+
+
+lbp_subsets_00_r = mt_to_terra(lbp_subsets_00, reproject = T)
+lbp_subsets_10_r = mt_to_terra(lbp_subsets_10, reproject = T)
+lbp_subsets_20_r = mt_to_terra(lbp_subsets_20, reproject = T)
+
+plot(lbp_subsets_00_r)
+plot(st_geometry(testpoints_sf), add = T)
+plot(lbp_subsets_10_r)
+plot(st_geometry(testpoints_sf), add = T)
+plot(lbp_subsets_20_r)
 plot(st_geometry(testpoints_sf), add = T)
 
 # Find date of overflight for use in subsets below
@@ -229,8 +271,9 @@ bandsOfInterest = bands[c(12,7,5,2),]$band
 bandsOfInterest
 
 MODproduct = "MOD13Q1"
+ndvi_dir = "ndvi_testpoints"
 
-# Benchmark the download time
+  # Benchmark the download time
 dlStart = Sys.time()
 
 # Batch download MODIS timeseries
@@ -638,19 +681,31 @@ https://rspatialdata.github.io/vegetation.html
 
 ```{r leaflet}
 label_ndvi = "NDVI"
+label_ndvi_00 = "NDVI 2000"
+label_ndvi_10 = "NDVI 2010"
+label_ndvi_20 = "NDVI 2020"
 tp_r_ndvi = raster(mt_to_terra(subsets, reproject = T))
+tp_r_ndvi_00 = raster(lbp_subsets_00_r)
+tp_r_ndvi_10 = raster(lbp_subsets_10_r)
+tp_r_ndvi_20 = raster(lbp_subsets_20_r)
 
 label_lc = "Land Cover Class"
 tp_r_lc = raster(mt_to_terra(subsets_lc, reproject = T))
 
 # Defining color palette
 pal_ndvi <- colorNumeric(c("#440154FF", "#238A8DFF", "#FDE725FF"), values(tp_r_ndvi), na.color = "transparent")
+pal_ndvi_00 <- colorNumeric(c("#440154FF", "#238A8DFF", "#FDE725FF"), values(tp_r_ndvi_00), na.color = "transparent")
+pal_ndvi_10 <- colorNumeric(c("#440154FF", "#238A8DFF", "#FDE725FF"), values(tp_r_ndvi_10), na.color = "transparent")
+pal_ndvi_20 <- colorNumeric(c("#440154FF", "#238A8DFF", "#FDE725FF"), values(tp_r_ndvi_20), na.color = "transparent")
+
 pal_lc <- colorNumeric(c("#440154FF", "#238A8DFF", "#FDE725FF"), values(tp_r_lc), na.color = "transparent")
 
 # Visualising using leaflet
 leaflet() %>%
   addTiles() %>%
-  addRasterImage(tp_r_ndvi, colors = pal_ndvi, opacity = 0.75, group = label_ndvi) %>%
+  addRasterImage(tp_r_ndvi_00, colors = pal_ndvi_00, opacity = 0.75, group = label_ndvi_00) %>%
+  addRasterImage(tp_r_ndvi_10, colors = pal_ndvi_10, opacity = 0.75, group = label_ndvi_10) %>%
+  addRasterImage(tp_r_ndvi_20, colors = pal_ndvi_20, opacity = 0.75, group = label_ndvi_20) %>%
   # addRasterImage(tp_r_lc, colors = pal_lc, opacity = 0.75, group = label_lc) %>%
   addMarkers(testpoints2, 
              lng = testpoints2$lon, 
@@ -658,7 +713,7 @@ leaflet() %>%
              label = testpoints2$site_name,
              group = "Test Points") %>%
   addLegend(
-    pal = pal_ndvi, values = values(tp_r_ndvi),
+    pal = pal_ndvi_00, values = values(tp_r_ndvi_00),
     title = label_ndvi
   )  %>% 
   # addLegend(
@@ -668,14 +723,19 @@ leaflet() %>%
   addProviderTiles("OpenStreetMap.Mapnik", group = "OpenStreetMap") %>%
   addProviderTiles("Esri.WorldImagery", group = "ESRI World Imagery") %>%
   addProviderTiles("Esri.WorldTopoMap", group = "ESRI World Topo") %>%
+  addScaleBar(position = "bottomright") %>%
   addLayersControl(
     baseGroups = c("OpenStreetMap", "ESRI World Imagery", "ESRI World Topo"),
     # overlayGroups = c(label_ndvi, label_lc),
-    overlayGroups = c(label_ndvi, "Test Points"),
-    options = layersControlOptions(collapsed = FALSE,),
+    overlayGroups = c(label_ndvi_00, 
+                      label_ndvi_10, 
+                      label_ndvi_20, 
+                      "Test Points"),
+    options = layersControlOptions(collapsed = TRUE,),
     position = "bottomleft"
-  )
-
+  ) %>%
+  hideGroup(label_ndvi_10) %>%
+  hideGroup(label_ndvi_20)
    
 ```
 
