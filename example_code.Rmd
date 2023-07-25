@@ -262,7 +262,7 @@ names(testpoints2) = c("site_name", "lat", "lon")
 View(dates)
 range(dates$calendar_date)
 
-startDate = "2016-01-01"
+startDate = "2000-01-01"
 endDate = "2022-12-31"
 
 bands$band
@@ -280,24 +280,28 @@ dlStart = Sys.time()
 VIQ = mt_batch_subset(df = testpoints2,
                       product = MODproduct,
                       band = bandsOfInterest[1],
+                      out_dir = "data/ndvi_KRV_10x2km_2000_2020",
                       internal = T,
                       start = startDate,
                       end = endDate)
 PR = mt_batch_subset(df = testpoints2,
                      product = MODproduct,
                      band = bandsOfInterest[2],
+                     out_dir = "data/ndvi_KRV_10x2km_2000_2020",
                      internal = T,
                      start = startDate,
                      end = endDate)
 NDVI = mt_batch_subset(df = testpoints2,
                       product = MODproduct,
                       band = bandsOfInterest[3],
+                      out_dir = "data/ndvi_KRV_10x2km_2000_2020",
                       internal = T,
                       start = startDate,
                       end = endDate)
 DOY = mt_batch_subset(df = testpoints2,
                       product = MODproduct,
                       band = bandsOfInterest[4],
+                      out_dir = "data/ndvi_KRV_10x2km_2000_2020",
                       internal = T,
                       start = startDate,
                       end = endDate)
@@ -711,6 +715,7 @@ leaflet() %>%
              lng = testpoints2$lon, 
              lat = testpoints2$lat, 
              label = testpoints2$site_name,
+             labelOptions = labelOptions(permanent = T),
              group = "Test Points") %>%
   addLegend(
     pal = pal_ndvi_00, values = values(tp_r_ndvi_00),
