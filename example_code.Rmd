@@ -46,7 +46,6 @@ library(MODIStsp)
 library(raster)
 library(sf)
 library(leaflet)
-library(raster)
 library(terra)
 library(luna)
 
@@ -115,7 +114,7 @@ dates_june2august_ndvi = dates_LC %>%
 
 # Set some example points
 testpoints = data.frame(
-  Point_id = c("Old River Channel SFWA", "Willows E of KRP", "Restoration N of KRP HQ"),
+  Point_id = c("Old River Channel SFWA", "Willows E of KRP", "Cottonwoods N of KRP HQ"),
   Latitude = c(35.667130, 35.669082, 35.669857),
   Longitude = c(-118.343102, -118.301213, -118.305338))
 
@@ -263,7 +262,7 @@ View(dates)
 range(dates$calendar_date)
 
 startDate = "2000-01-01"
-endDate = "2022-12-31"
+endDate = "2024-06-09"
 
 bands$band
 
@@ -273,7 +272,7 @@ bandsOfInterest
 MODproduct = "MOD13Q1"
 ndvi_dir = "ndvi_testpoints"
 
-  # Benchmark the download time
+# Benchmark the download time
 dlStart = Sys.time()
 
 # Batch download MODIS timeseries
@@ -476,6 +475,27 @@ DOYplot = ggplot(DOY_corrected[[3]],
   ggtitle("Accounting for composite date") +
   theme_classic() +
   scale_color_brewer(palette = "Dark2"); DOYplot
+
+DOYplot + 
+  ggtitle("NDVI from 2000-2023 with low snow-pack years") +
+  geom_segment(aes(x = as.POSIXct("2006-12-01"), y = 0.8, 
+                   xend = as.POSIXct("2007-06-01"), yend = c(0.8)),
+               size = 2, col = "orange") +
+  geom_segment(aes(x = as.POSIXct("2011-12-01"), y = 0.8, 
+                   xend = as.POSIXct("2015-05-01"), yend = c(0.8)),
+               size = 4, col = "red") +
+  geom_segment(aes(x = as.POSIXct("2017-12-01"), y = 0.8, 
+                   xend = as.POSIXct("2018-06-01"), yend = c(0.8)),
+               size = 2, col = "orange") +
+  geom_segment(aes(x = as.POSIXct("2019-12-01"), y = 0.8, 
+                   xend = as.POSIXct("2022-06-01"), yend = c(0.8)),
+               size = 3, col = "orange3")  +
+  geom_vline(xintercept = as.POSIXct("2014-02-01"), col = "blue", size = 1) +
+  geom_text(x = as.POSIXct("2014-05-01"), 
+            y = 0.7, 
+            label = "diversion",
+            col = "blue",
+            angle = 90)
 ```
 
 
