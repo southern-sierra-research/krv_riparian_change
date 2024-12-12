@@ -1,0 +1,344 @@
+---
+title: "PrismDataGrab"
+author: "Patrick D. lorch"
+date: "2024-12-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## PRISM weather data
+
+https://github.com/ropensci/prism
+
+We may want to group these by the 12 months before the
+
+### Bioclim summary
+
+https://www.worldclim.org/data/bioclim.html
+
+Summarizing weather data by month and quarter according to Bioclim method.
+
+Layer descriptions:
+
+BIO1 = Annual Mean Temperature
+BIO2 = Mean Diurnal Range (Mean of monthly (max temp - min temp))
+BIO3 = Isothermality (BIO2/BIO7) (×100)
+BIO4 = Temperature Seasonality (standard deviation ×100)
+BIO5 = Max Temperature of Warmest Month
+BIO6 = Min Temperature of Coldest Month
+BIO7 = Temperature Annual Range (BIO5-BIO6)
+BIO8 = Mean Temperature of Wettest Quarter
+BIO9 = Mean Temperature of Driest Quarter
+BIO10 = Mean Temperature of Warmest Quarter
+BIO11 = Mean Temperature of Coldest Quarter
+BIO12 = Annual Precipitation
+BIO13 = Precipitation of Wettest Month
+BIO14 = Precipitation of Driest Month
+BIO15 = Precipitation Seasonality (Coefficient of Variation)
+BIO16 = Precipitation of Wettest Quarter
+BIO17 = Precipitation of Driest Quarter
+BIO18 = Precipitation of Warmest Quarter
+BIO19 = Precipitation of Coldest Quarter
+
+### Get new prism data
+
+
+
+```{r prism}
+library(prism)
+# library(dismo) #Does not work. Still dependent on raster and sp
+library(terra)
+library(luna)
+
+prism_get_dl_dir()
+prism_set_dl_dir("Prism")
+prism_check_dl_dir()
+
+# This may take a long time on a slow connection (not bad with new Starlink)
+get_prism_monthlys(type = "ppt", year = 2023:2024, mon = 1:12, keepZip = FALSE)
+get_prism_monthlys(type = "tmax", year = 2023:2024, mon = 1:12, keepZip = FALSE)
+get_prism_monthlys(type = "tmin", year = 2023:2024, mon = 1:12, keepZip = FALSE)
+
+prism_archive_ls()
+
+ppt_21 = prism_archive_subset("ppt", "monthly", years = 2021)
+ppt_22 = prism_archive_subset("ppt", "monthly", years = 2022)
+ppt_23 = prism_archive_subset("ppt", "monthly", years = 2023)
+ppt_24 = prism_archive_subset("ppt", "monthly", years = 2024)
+# These methods get 12 months before June to be used as covariates for 
+#   bird breeding or NDVI analyses
+# ppt_21_7_12 = prism_archive_subset("ppt", "monthly", mon = 7:12, years = 2021)
+# ppt_22_1_6 = prism_archive_subset("ppt", "monthly", mon = 1:6, years = 2022)
+
+tmax_21 = prism_archive_subset("tmax", "monthly", years = 2021)
+tmax_22 = prism_archive_subset("tmax", "monthly", years = 2022)
+tmax_23 = prism_archive_subset("tmax", "monthly", years = 2023)
+tmax_24 = prism_archive_subset("tmax", "monthly", years = 2024)
+# tmax_21_7_12 = prism_archive_subset("tmax", "monthly", mon = 7:12, years = 2021)
+# tmax_22_1_6 = prism_archive_subset("tmax", "monthly", mon = 1:6, years = 2022)
+
+tmin_21 = prism_archive_subset("tmin", "monthly", years = 2021)
+tmin_22 = prism_archive_subset("tmin", "monthly", years = 2022)
+tmin_23 = prism_archive_subset("tmin", "monthly", years = 2023)
+tmin_24 = prism_archive_subset("tmin", "monthly", years = 2024)
+# tmin_21_7_12 = prism_archive_subset("tmin", "monthly", mon = 7:12, years = 2021)
+# tmin_22_1_6 = prism_archive_subset("tmin", "monthly", mon = 1:6, years = 2022)
+
+ppt_21 = pd_to_file(ppt_21)
+ppt_22 = pd_to_file(ppt_22)
+ppt_23 = pd_to_file(ppt_23)
+ppt_24 = pd_to_file(ppt_24)
+# ppt_21_7_12= pd_to_file(ppt_21_7_12)
+# ppt_22_1_6 = pd_to_file(ppt_22_1_6)
+
+tmax_21 = pd_to_file(tmax_21)
+tmax_22 = pd_to_file(tmax_22)
+tmax_23 = pd_to_file(tmax_23)
+tmax_24 = pd_to_file(tmax_24)
+# tmax_21_7_12 = pd_to_file(tmax_21_7_12)
+# tmax_22_1_6 = pd_to_file(tmax_22_1_6)
+
+tmin_21 = pd_to_file(tmin_21)
+tmin_22 = pd_to_file(tmin_22)
+tmin_23 = pd_to_file(tmin_23)
+tmin_24 = pd_to_file(tmin_24)
+# tmin_21_7_12 = pd_to_file(tmin_21_7_12)
+# tmin_22_1_6 = pd_to_file(tmin_22_1_6)
+
+# dismo::biovars does not work on spatrasters
+#   But maybe someday...
+# ppt_21 = rast(ppt_21)
+
+# Get period of interest all of 2021 and months 1-6 of 2022
+# This is too many months for bioclim summaries
+# ppt = raster::stack(c(ppt_21, ppt_22_1_6))
+# tmax = raster::stack(c(tmax_21, tmax_22_1_6))
+# tmin = raster::stack(c(tmin_21, tmin_22_1_6))
+
+ppt_21 = raster::stack(ppt_21)
+ppt_22 = raster::stack(ppt_22)
+ppt_23 = raster::stack(ppt_23)
+ppt_24 = raster::stack(ppt_24)
+tmax_21 = raster::stack(tmax_21)
+tmax_22 = raster::stack(tmax_22)
+tmax_23 = raster::stack(tmax_23)
+tmax_24 = raster::stack(tmax_24)
+tmin_21 = raster::stack(tmin_21)
+tmin_22 = raster::stack(tmin_22)
+tmin_23 = raster::stack(tmin_23)
+tmin_24 = raster::stack(tmin_24)
+
+# needs to be 12 months for biovars
+# ppt12 = raster::stack(c(ppt_21_7_12, ppt_22_1_6))
+# tmax12 = raster::stack(c(tmax_21_7_12, tmax_22_1_6))
+# tmin12 = raster::stack(c(tmin_21_7_12, tmin_22_1_6))
+biovars_21 = biovars(prec = ppt_21, tmin = tmin_21, tmax = tmax_21)
+crs(biovars_21)
+biovars_22 = biovars(prec = ppt_22, tmin = tmin_22, tmax = tmax_22)
+crs(biovars_22)
+biovars_23 = biovars(prec = ppt_23, tmin = tmin_23, tmax = tmax_23)
+crs(biovars_23)
+# Dec not complete at time of running so not doing this one
+# biovars_24 = biovars(prec = ppt_24, tmin = tmin_24, tmax = tmax_24)
+# crs(biovars_24)
+
+dir.create("PrismRasters")
+biovarsprism = "PrismRasters"
+# biovarsprism = "C:/Users/PatrickLorch/SSRS/Southern Sierra Research Station - Documents/Projects/YBCU - Rangewide Surveys CSWG/GIS/PrismWeatherSummaries2021_2022"
+
+# Multiband raster
+# raster::writeRaster(biovars_21, filename = file.path(biovarsprism, "biovarsPrism21.bil"), format = "EHdr",overwrite = T)
+# Bands seperated
+raster::writeRaster(biovars_21, filename = file.path(biovarsprism, "biovarsPrism21.bil"), format = "EHdr",overwrite = T, bylayer = T)
+
+# raster::writeRaster(biovars_22, filename = file.path(biovarsprism, "biovarsPrism22.bil"), format = "EHdr",overwrite = T)
+# Bands seperated
+raster::writeRaster(biovars_22, filename = file.path(biovarsprism, "biovarsPrism22.bil"), format = "EHdr",overwrite = T, bylayer = T)
+
+# raster::writeRaster(biovars_23, filename = file.path(biovarsprism, "biovarsPrism23.bil"), format = "EHdr",overwrite = T)
+# Bands seperated
+raster::writeRaster(biovars_23, filename = file.path(biovarsprism, "biovarsPrism23.bil"), format = "EHdr",overwrite = T, bylayer = T)
+
+# Dec not complete at time of running so not doing this one
+# raster::writeRaster(biovars_24, filename = file.path(biovarsprism, "biovarsPrism24.bil"), format = "EHdr",overwrite = T)
+# # Bands seperated
+# raster::writeRaster(biovars_24, filename = file.path(biovarsprism, "biovarsPrism24.bil"), format = "EHdr",overwrite = T, bylayer = T)
+
+```
+
+## summarize data by sub-watersheds
+
+'hybas_na_lev01-12_v1c' has watersheds at 12 levels, so this approach would work at other levels.
+
+```{r subwatersheds}
+huc8 = readOGR("hybas_na_lev01-12_v1c/hybas_na_lev08_v1c.shp")
+
+# Mean
+# spatRaster method
+huc8_vect = vect("hybas_na_lev01-12_v1c/hybas_na_lev08_v1c.shp")
+# plot(huc8_vect)
+ppt_21_sr = rast(ppt_21)
+proj4string(ppt_21)
+crs(ppt_21_sr) = "epsg:4269"
+huc8_vect_4269 = project(huc8_vect, ppt_21_sr)
+ppt_21_mean_huc8_vect = terra::extract(ppt_21_sr, huc8_vect_4269, fun = mean, bind = T)
+# writeVector(ppt_21_mean_huc8_vect, 
+#             filename = file.path(biovarsprism, "ppt_21_mean_huc8_vect.shp"), 
+#             filetype = "ESRI Shapefile", 
+#             overwrite=TRUE)
+
+ppt_21_mean_huc8_vect$mean_yr = mean(ppt_21_mean_huc8_vect[,14:25])
+
+# raster method
+ppt_mean_huc8 = extract(ppt, huc8, fun = mean)
+
+ppt_mean_huc8.df = as.data.frame(ppt_mean_huc8)
+huc8@data = data.frame(huc8@data, ppt_mean_huc8.df)
+
+colnames(huc8@data)[14:31] = c(paste("pptmn21", 1:12, sep = "_"), 
+                               paste("pptmn22", 1:6, sep = "_"))
+writeOGR(huc8, ".", "ppt_mean_huc8.shp", driver = "ESRI Shapefile")
+writeOGR(huc8, file.path(biovarsprism, "ppt_mean_huc8.shp"), ppt_mean_huc8, driver = "ESRI Shapefile")
+
+# Sum
+# spatRaster method
+# huc8_vect = vect("hybas_na_lev01-12_v1c/hybas_na_lev08_v1c.shp")
+# ppt_sr = rast(ppt)
+ppt_21_sum_huc8_vect = terra::extract(ppt_21_sr, huc8_vect_4269, fun = sum, bind = T)
+# writeVector(ppt_21_sum_huc8_vect, 
+#             filename = file.path(biovarsprism, "ppt_sum_huc8_vect.shp"), 
+#             filetype = "ESRI Shapefile", 
+#             overwrite=TRUE)
+
+# raster method
+# Not used
+# ppt_sum_huc8 = extract(ppt, huc8, fun = sum)
+# 
+# ppt_sum_huc8.df = as.data.frame(ppt_sum_huc8)
+# 
+# huc8_2@data = data.frame(huc8_2@data, ppt_sum_huc8.df)
+# 
+# colnames(huc8_2@data)[14:31] = c(paste("pptsum21", 1:12, sep = "_"), 
+#                                paste("pptsum22", 1:6, sep = "_"))
+# writeOGR(huc8_2, ".", fname = file.path(biovarsprism, "ppt_sum_huc8.shp"), driver = "ESRI Shapefile")
+
+```
+
+## Plots to check extents and look at rasters
+
+```{r simpleplots}
+library(ggplot2)
+
+caltowhee_ext = ext(-118.000, -117.120, 35.5, 36.25)
+caltowhee_points = data.frame(longitude = c(-117.53839, -117.39282),
+                              latitude = c(35.94762, 35.96628))
+
+# BIO13 =  Precipitation of Wettest Month
+plot(terra::crop(rast(biovars_21$bio13), caltowhee_ext))
+lines(ppt_21_mean_huc8_vect)
+points(caltowhee_points, pch = 19)
+# BIO16 = Precipitation of Wettest Quarter
+plot(terra::crop(rast(biovars_21$bio16), caltowhee_ext))
+lines(ppt_21_mean_huc8_vect)
+# BIO19 = Precipitation of Coldest Quarter
+plot(terra::crop(rast(biovars_21$bio19), caltowhee_ext))
+lines(ppt_21_mean_huc8_vect)
+
+# BIO13 =  Precipitation of Wettest Month
+ppt_wet_mnth_21 = biovars_21$bio13 %>%
+  raster::extract(caltowhee_points)
+ppt_wet_mnth_22 = biovars_22$bio13 %>%
+  raster::extract(caltowhee_points)
+ppt_wet_mnth_23 = biovars_23$bio13 %>%
+  raster::extract(caltowhee_points)
+ppt_wet_mnth_21_23 = data.frame(rbind(ppt_wet_mnth_21, ppt_wet_mnth_22, ppt_wet_mnth_23))
+names(ppt_wet_mnth_21_23) = c("TowheeNAWS1", "TowheeBLM1")
+ppt_wet_mnth_21_23$Year = 21:23
+p13 = ggplot(ppt_wet_mnth_21_23, aes(Year)) + 
+  geom_line(aes(y = TowheeNAWS1), col = "grey") +
+  geom_line(aes(y = TowheeBLM1), col = "red")
+p13
+
+# BIO16 = Precipitation of Wettest Quarter
+ppt_wet_qrtr_21 = biovars_21$bio16 %>%
+  raster::extract(caltowhee_points)
+ppt_wet_qrtr_22 = biovars_22$bio16 %>%
+  raster::extract(caltowhee_points)
+ppt_wet_qrtr_23 = biovars_23$bio16 %>%
+  raster::extract(caltowhee_points)
+ppt_wet_qrtr_21_23 = data.frame(rbind(ppt_wet_qrtr_21, ppt_wet_qrtr_22, ppt_wet_qrtr_23))
+names(ppt_wet_qrtr_21_23) = c("TowheeNAWS1", "TowheeBLM1")
+ppt_wet_qrtr_21_23$Year = 21:23
+p16 = ggplot(ppt_wet_qrtr_21_23, aes(Year)) + 
+  geom_line(aes(y = TowheeNAWS1), col = "grey") +
+  geom_line(aes(y = TowheeBLM1), col = "red")
+p16
+
+# BIO19 = Precipitation of Coldest Quarter
+ppt_cold_qrtr_21 = biovars_21$bio19 %>%
+  raster::extract(caltowhee_points)
+ppt_cold_qrtr_22 = biovars_22$bio19 %>%
+  raster::extract(caltowhee_points)
+ppt_cold_qrtr_23 = biovars_23$bio19 %>%
+  raster::extract(caltowhee_points)
+ppt_cold_qrtr_21_23 = data.frame(rbind(ppt_cold_qrtr_21, ppt_cold_qrtr_22, ppt_cold_qrtr_23))
+names(ppt_cold_qrtr_21_23) = c("TowheeNAWS1", "TowheeBLM1")
+ppt_cold_qrtr_21_23$Year = 21:23
+p19 = ggplot(ppt_cold_qrtr_21_23, aes(Year)) + 
+  geom_line(aes(y = TowheeNAWS1), col = "grey") +
+  geom_line(aes(y = TowheeBLM1), col = "red")
+p19
+
+```
+
+
+## Some better plots
+
+These plots can be exported to an html.  They allow the end user to move around, zoom, and change background images.
+
+### Leaflet
+
+From here:
+https://rspatialdata.github.io/vegetation.html
+
+```{r leaflet}
+library(dplyr)
+library(leaflet)
+
+pal_biovars_21_bio13 = colorNumeric(c("#440154FF", "#238A8DFF", "#FDE725FF"), values(biovars_21$bio13), na.color = "transparent")
+
+# Visualising using leaflet
+leaflet() %>%
+  addTiles() %>%
+  addRasterImage(biovars_21$bio13, 
+                 colors = pal_biovars_21_bio13,
+                 opacity = 0.75, 
+                 group = "Precip., Wettest Mnth.") %>%
+  addPolygons(data = huc8, group = "HUC8 watersheds", fillOpacity = 0) %>%
+  addCircleMarkers(caltowhee_points$longitude, 
+                   caltowhee_points$latitude,
+                   color = "red") %>%
+  setView(lng = -117.5, lat = 35.9, zoom = 9) %>%
+  addLegend(
+    pal = pal_biovars_21_bio13, 
+    values = values(biovars_21$bio13),
+    title = "Precip. (mm)"
+  )  %>% 
+  addProviderTiles("OpenStreetMap.Mapnik", group = "OpenStreetMap") %>%
+  addProviderTiles("Esri.WorldImagery", group = "ESRI World Imagery") %>%
+  addProviderTiles("Esri.WorldTopoMap", group = "ESRI World Topo") %>%
+  addScaleBar(position = "bottomright") %>%
+  addLayersControl(
+    baseGroups = c("OpenStreetMap", "ESRI World Imagery", "ESRI World Topo"),
+    # overlayGroups = c(label_ndvi, label_lc),
+    overlayGroups = c("Precip., Wettest Mnth.",
+                      "HUC8 watersheds"),
+    options = layersControlOptions(collapsed = TRUE,),
+    position = "bottomleft"
+  ) 
+
+```
