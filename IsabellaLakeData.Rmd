@@ -1,0 +1,92 @@
+---
+title: "IsabellaLakeData"
+author: "Patrick D. lorch"
+date: "2025-04-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Lake Isabella data
+
+Here is a link the the Army Corp website with hourly (H) and Daily (D) data going back to 1995:
+https://www.spk-wc.usace.army.mil/plots/california.html
+
+I imagine this data will be useful for multiple projects, but it makes sense to have it in krv_riparian_change, maintain it here, update it here, and grab it from here.
+
+ToDo:
+
+1. Set it up to import and combine years as needed.
+2. Set it up to allow easy yearly updates
+2. Get it into a postgres database
+
+## Get data from CSV files
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r lakeisabella}
+library(dplyr)
+library(tidyverse)
+
+yearly_file_list = 
+  list.files(file.path("C:",
+                       "Users",
+                       "PatrickLorch",
+                       "SSRS",
+                       "Southern Sierra Research Station - Documents",
+                       "Projects",
+                       "krv_riparian_change",
+                       "Lake_Isabella_pool_ACOE_data1995to2025partial"),
+             pattern = '\\.csv', full.names = TRUE)
+
+# Not sure if it is worth finding ones that are partial and eliminating from list
+basename(yearly_file_list[31])
+
+# Read them into a tibble
+lkisb = readr::read_csv(yearly_file_list, id = "file_name")
+
+# Get a workable datetime
+lkisb$DateTime = as.POSIXct(lkisb$`ISO 8601 Date Time`,
+                            format = "%Y-%m-%dT%H:%M:%S")
+lkisb$Year = year(lkisb$DateTime)
+# Change to numeric
+#  This will need to change if new imports change columns
+tonumeric = names(lkisb)[c(3, 5, 7, 9, 11, 13, 15, 17, 19, 21,
+                           23:28)]
+lkisb = lkisb %>% mutate_at(tonumeric, as.numeric)
+
+```
+
+## Lake elevation by year
+
+This method removes any lines that are blank for elevation before calculations.
+
+```{r elev}
+
+yearly_elevs = lkisb %>%
+  group_by(Year) %>%
+  filter(!is.na(`Elevation (ft-IPD)`)) %>%
+  summarize(MaxElevation = max(`Elevation (ft-IPD)`),
+         MinElevation = min(`Elevation (ft-IPD)`))
+write.csv(yearly_elevs, "yearly_elevs.csv", row.names = F)
+
+  
+
+```
+
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
