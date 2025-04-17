@@ -42,7 +42,7 @@ There are 3 MODIS packages. All have problems due to transition away from packag
 
 library(dplyr)
 library(MODISTools)
-library(MODIStsp)
+# library(MODIStsp)
 library(raster)
 library(sf)
 library(leaflet)
@@ -237,6 +237,12 @@ plot(st_geometry(testpoints_sf), add = T)
 ## MODIStools tutorial example with QA/QC
 
 https://jepsonnomad.github.io/tutorials/MODISTools_Intro.html
+
+### Snow pack depth info
+
+We use these to mark drought periods in plots.
+
+https://cdec.water.ca.gov/
 
 ```{r modistoolstutoial}
 library(MODISTools)
@@ -499,7 +505,7 @@ DOYplot +
 ```
 
 
-## Using MODIStsp
+## Using MODIStsp (Not used)
 
 This now works, but continues to depend on many of the soon to be unsupported packages.
 
@@ -508,10 +514,12 @@ MODIStsp()
 
 ```
 
-## Using terra and luna
+## Using terra and luna (Not used?)
 
 Based on this example:
 https://rspatial.org/modis/2-download.html
+
+Up to this point this just looked at what is out there through this package.
 
 ```{r terraluna}
 prod <- getProducts()
