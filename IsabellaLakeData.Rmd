@@ -20,13 +20,12 @@ ToDo:
 
 1. Set it up to import and combine years as needed.
 2. Set it up to allow easy yearly updates
+  a. Need to use readr to import with formatting or fix formatting where numbers have been imported as characters
 2. Get it into a postgres database
 
 ## Get data from CSV files
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+Get a list of files downloaded and 
 
 ```{r lakeisabella}
 library(dplyr)
@@ -79,14 +78,139 @@ write.csv(yearly_elevs, "yearly_elevs.csv", row.names = F)
 ```
 
 
+## Snow levels upstream of Lake Isabella
 
+Snow levels are reported as Snow Water Equivalent (SWE) in inches.
 
-## Including Plots
+Snow station data is from https://cdec.water.ca.gov/dynamicapp/staSearch
 
-You can also embed plots, for example:
+cdec_query from package cder and CDECquery from sharpshootR does not work. Returns 0 records.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+CDECRetrieve needs to update something like20 packages, most of which are loaded.
+
+ggdensity and ggridges did not seem to work.
+
+ToDo:
+
+* Map of where snow monitoring stations are
+
+* stacked plot with multiple years and Water Year (WY) (Oct. 1 WY - 1) to Sept. 30 WY for arbitrary years
+    * https://stackoverflow.com/questions/48123049/create-day-index-based-on-water-year
+
+3. Area Under Curve estimates for each of these plots
+
+```{r snow}
+library(tidyverse)
+library(readr)
+library(sf)
+library(leaflet)
+library(lubridate)
+library(ggplot2)
+# install.packages("ggdensity")
+# library(ggdensity)
+# install.packages("ggridges")
+# library(ggridges)
+# installeaflet# install.packages("cder")
+# library(cder)
+# install.packages("sharpshootR")
+# library(sharpshootR)
+# library(devtools)
+# install_git("https://github.com/FlowWest/CDECRetrieve.git")
+# library(CDECRetrieve)
+
+tn = names(lkisb)
+snowsites = unique(substr(tn[grepl("SWE", tn)], 1, 3))
+snowsites_files = list.files("SnowStations/", full.names = T)
+
+snowsites.df =  readr::read_csv(snowsites_files, id = "file_name")
+
+snowsites.sf = st_as_sf(snowsites.df,
+                        coords = c("Longitude",
+                                   "Latitude"),
+                        crs = "4236")
+leaflet() %>%
+  # add different provider tiles
+  addProviderTiles(
+    "Esri.WorldImagery",
+    group = "Esri.WorldImagery"
+  ) %>%
+  addProviderTiles(
+    "OpenStreetMap",
+    # give the layer a name
+    group = "OpenStreetMap"
+  ) %>%
+# add a layers control
+  addLayersControl(
+    baseGroups = c(
+      "Esri.WorldImagery", "OpenStreetMap"
+    ),
+    # position it on the topleft
+    position = "topleft"
+  ) %>%
+  addMarkers(data = snowsites.df, 
+             lng = ~Longitude,
+             lat = ~Latitude,
+             label = ~snowsites.df$"Station Name")
+
+wy_start_md = "10-01"
+wy_end_md = "09-30"
+
+years_data = 
+  sort(unique(lkisb$Year))
+data.frame(start =
+             as.POSIXct(paste(years_data - 1, wy_start_md, sep = "-")),
+           end = as.POSIXct(paste(years_data , wy_end_md, sep = "-")))
+
+wtr_yr <- function(dates, start_month=10) {
+  # Convert dates into POSIXlt
+  dates.posix = as.POSIXlt(dates)
+  # Year offset
+  offset = ifelse(dates.posix$mon >= start_month - 1, 1, 0)
+  # Water year
+  adj.year = dates.posix$year + 1900 + offset
+  # Return the water year
+  adj.year
+}
+
+lkisb$wtr_yr <-wtr_yr(lkisb$DateTime)
+
+lkisb = lkisb %>%
+  arrange(DateTime)
+
+# ggplot
+snow.cols = c("PSC SWE (in; elev 9,120 ft)",
+                  "UTY SWE (in; elev 11,500 ft)",
+                  "WTM SWE (in; elev 9,039 ft)")
+lkisb.snow = lkisb %>%
+  filter(DateTime < "2025-04-09") %>%
+  select(DateTime, wtr_yr, snow.cols) %>%
+  pivot_longer(cols = !c(DateTime, wtr_yr), 
+               names_to = "Site", 
+               values_to = "Snow Depth (in)") %>%
+  mutate(Site.1st3 = substr(Site, 1, 3))
+
+# Smaller data set for testing
+lkisb.snow.wy11_12 = lkisb.snow %>%
+  filter(wtr_yr %in% 2011:2012)
+
+lkisb.snow %>%
+  # filter(wtr_yr %in% 1994:1999) %>%
+  # filter(wtr_yr %in% 2000:2009) %>%
+  # filter(wtr_yr %in% 2010:2019) %>%
+  filter(wtr_yr %in% 2020:2024) %>%
+# lkisb.snow.wy11_12 %>%
+  ggplot(aes(x = DateTime, 
+           y = `Snow Depth (in)`, 
+           fill = Site.1st3)) +
+  geom_area() +
+  labs(x = "Date", fill = "Site") +
+  # scale_x_date(date_labels = "%b %d") +
+  facet_wrap(~wtr_yr,  ncol=2, scales = "free_x") 
+
+ggsave("LkIsabellaSnowDepth20_24.jpg", 
+       height = 7, width = 9, units = "in")
+ggsave("LkIsabellaSnowDepth20_24.pdf", 
+       height = 7, width = 9, units = "in")
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
